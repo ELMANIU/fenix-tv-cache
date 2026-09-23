@@ -3,48 +3,32 @@ export default {
 
     const url = new URL(request.url);
 
-    const path = url.pathname;
+    // quitar /cache/
+    let path = url.pathname.replace("/cache", "");
 
-    const origin = "http://200.234.234.244";
+    const origen = "http://fenixstream.duckdns.org";
 
-    const response = await fetch(origin + path, {
+    const destino = origen + path + url.search;
+
+    const respuesta = await fetch(destino, {
       headers: {
         "User-Agent": "Mozilla/5.0"
       }
     });
 
-    const headers = new Headers();
+    const nuevo = new Response(respuesta.body, respuesta);
 
-    headers.set(
-      "Content-Type",
-      response.headers.get("Content-Type") || "application/octet-stream"
-    );
-
-    headers.set(
+    nuevo.headers.set(
       "Access-Control-Allow-Origin",
       "*"
     );
 
-    if(path.endsWith(".m3u8")){
-      headers.set(
-        "Cache-Control",
-        "no-cache"
-      );
-    }
-
-    if(path.endsWith(".ts")){
-      headers.set(
-        "Cache-Control",
-        "public, max-age=60"
-      );
-    }
-
-    return new Response(
-      response.body,
-      {
-        status: response.status,
-        headers
-      }
+    // cache Cloudflare
+    nuevo.headers.set(
+      "Cache-Control",
+      "public, max-age=10"
     );
+
+    return nuevo;
   }
 }
