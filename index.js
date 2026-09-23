@@ -7,15 +7,24 @@ export default {
 
     const origin = "http://fenixstream.duckdns.org" + path + url.search;
 
-    const response = await fetch(origin, {
+    const newRequest = new Request(origin, {
+      method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Cache-Control": "no-cache"
+      },
+      cf: {
+        cacheTtl: 0,
+        cacheEverything: false
       }
     });
 
+
+    const response = await fetch(newRequest);
+
     const headers = new Headers(response.headers);
 
-    // PLAYLIST EN VIVO
+
     if (url.pathname.endsWith(".m3u8")) {
 
       headers.set(
@@ -35,17 +44,16 @@ export default {
     }
 
 
-    // SEGMENTOS TS
     if (url.pathname.endsWith(".ts")) {
 
       headers.set(
         "Cache-Control",
-        "public, max-age=5"
+        "public, max-age=3"
       );
 
       headers.set(
         "CDN-Cache-Control",
-        "public, max-age=5"
+        "public, max-age=3"
       );
     }
 
@@ -55,9 +63,11 @@ export default {
       "*"
     );
 
+
     return new Response(response.body, {
       status: response.status,
       headers
     });
+
   }
 };
