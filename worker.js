@@ -1,61 +1,68 @@
 const ORIGIN = "https://cablered.iptvperu.tv:1936/cablered/bitme_new/";
 
 export default {
-  async fetch(request) {
+ async fetch(request) {
 
-    const url = new URL(request.url);
+  const url = new URL(request.url);
 
-    let path = url.pathname;
+  if (url.pathname.endsWith(".m3u8")) {
 
-    if (path.endsWith(".m3u8")) {
-      const target = ORIGIN + "playlist.m3u8";
+    const res = await fetch(ORIGIN + "playlist.m3u8", {
+      headers:{
+        "User-Agent":"Mozilla/5.0"
+      }
+    });
 
-      const response = await fetch(target, {
-        headers: {
-          "User-Agent": "Mozilla/5.0"
+    let body = await res.text();
+
+    body = body.split("\n").map(line => {
+
+      if(line && !line.startsWith("#")) {
+
+        if(line.startsWith("http")) {
+          return line;
         }
-      });
 
-      let text = await response.text();
+        return url.origin + "/bitme/" + line;
+      }
 
-      // Reescribe segmentos para que pasen por el Worker
-      text = text.replace(
-        /([^#\n].*\.ts.*)/g,
-        "/bitme/$1"
-      );
+      return line;
 
-      return new Response(text, {
-        headers:{
-          "Content-Type":"application/vnd.apple.mpegurl",
-          "Cache-Control":"no-cache"
-        }
-      });
-    }
+    }).join("\n");
 
 
-    if (path.startsWith("/bitme/")) {
+    return new Response(body,{
+      headers:{
+        "Content-Type":"application/vnd.apple.mpegurl",
+        "Cache-Control":"no-cache"
+      }
+    });
 
-      const file = path.replace("/bitme/","");
-
-      const response = await fetch(
-        ORIGIN + file,
-        {
-          headers:{
-            "User-Agent":"Mozilla/5.0"
-          }
-        }
-      );
-
-      return new Response(response.body,{
-        headers:{
-          "Content-Type":"video/mp2t",
-          "Cache-Control":"public,max-age=30"
-        }
-      });
-
-    }
-
-
-    return new Response("OK");
   }
-};
+
+
+  if(url.pathname.startsWith("/bitme/")){
+
+    const file = url.pathname.replace("/bitme/","");
+
+    const res = await fetch(ORIGIN + file,{
+      headers:{
+        "User-Agent":"Mozilla/5.0"
+      }
+    });
+
+
+    return new Response(res.body,{
+      headers:{
+        "Content-Type":"video/mp2t",
+        "Cache-Control":"public,max-age=30"
+      }
+    });
+
+  }
+
+
+  return new Response("Worker activo");
+
+ }
+}
