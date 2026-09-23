@@ -23,7 +23,7 @@ export default {
         cacheTtl: 86400
       };
 
-    } else if (path.endsWith(".m3u8")) {
+    } else {
 
       opciones.cf = {
         cacheEverything: false
@@ -34,9 +34,7 @@ export default {
 
     const respuesta = await fetch(destino, opciones);
 
-
     const nuevo = new Response(respuesta.body, respuesta);
-
 
     nuevo.headers.set(
       "Access-Control-Allow-Origin",
