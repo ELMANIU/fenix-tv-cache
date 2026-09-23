@@ -3,67 +3,36 @@ export default {
 
     const url = new URL(request.url);
 
-    // Quita /cache para ir al origen
-    const path = url.pathname.replace("/cache", "");
+    const origin =
+      "http://fenixstream.duckdns.org" +
+      url.pathname.replace("/cache","");
 
-    const origen = "http://fenixstream.duckdns.org";
-
-    const respuesta = await fetch(origen + path + url.search, {
-      method: request.method,
+    const response = await fetch(origin, {
       headers: {
-        "User-Agent": "Mozilla/5.0"
-      },
-      cf: {
-        cacheTtl: 0,
-        cacheEverything: false
+        "Cache-Control": "no-cache"
       }
     });
 
-
-    const headers = new Headers(respuesta.headers);
+    const headers = new Headers(response.headers);
 
     headers.set(
-      "Access-Control-Allow-Origin",
-      "*"
+      "Cache-Control",
+      "no-cache, no-store, must-revalidate"
     );
 
+    headers.set(
+      "CDN-Cache-Control",
+      "no-store"
+    );
 
-    // EL VIVO SIEMPRE DEBE ACTUALIZARSE
-    if (path.endsWith(".m3u8")) {
+    headers.set(
+      "Cloudflare-CDN-Cache-Control",
+      "no-store"
+    );
 
-      headers.set(
-        "Cache-Control",
-        "no-cache, no-store, must-revalidate, max-age=0"
-      );
-
-      headers.set(
-        "CDN-Cache-Control",
-        "no-store"
-      );
-
-      headers.set(
-        "Pragma",
-        "no-cache"
-      );
-
-    }
-
-
-    // LOS SEGMENTOS SÍ SE PUEDEN CACHEAR
-    if (path.endsWith(".ts")) {
-
-      headers.set(
-        "Cache-Control",
-        "public, max-age=86400"
-      );
-
-    }
-
-
-    return new Response(respuesta.body, {
-      status: respuesta.status,
+    return new Response(response.body,{
+      status: response.status,
       headers
     });
-
   }
-};
+}
