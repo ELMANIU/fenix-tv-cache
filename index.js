@@ -9,11 +9,17 @@ export default {
 
     const destino = origen + path + url.search;
 
+
     const respuesta = await fetch(destino, {
       headers: {
         "User-Agent": "Mozilla/5.0"
+      },
+      cf: {
+        cacheEverything: true,
+        cacheTtl: 86400
       }
     });
+
 
     const nuevo = new Response(respuesta.body, respuesta);
 
@@ -31,10 +37,7 @@ export default {
         "no-cache, no-store, must-revalidate"
       );
 
-    }
-
-
-    if (path.endsWith(".ts")) {
+    } else if (path.endsWith(".ts")) {
 
       nuevo.headers.set(
         "Cache-Control",
