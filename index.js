@@ -1,90 +1,81 @@
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request) {
 
     const url = new URL(request.url);
 
+    // Quitar prefijo /cache/
     let path = url.pathname.replace("/cache", "");
 
+    // Servidor origen
     const origen = "http://fenixstream.duckdns.org";
 
     const destino = origen + path + url.search;
 
 
-    // Solo cachear segmentos TS
-    const esTS = path.endsWith(".ts");
-
-
-    const cache = caches.default;
-
-
-    if (esTS) {
-
-      const cacheKey = new Request(request.url, request);
-
-      const cached = await cache.match(cacheKey);
-
-      if (cached) {
-        return cached;
-      }
-
-
-      const respuesta = await fetch(destino, {
-        headers: {
-          "User-Agent": "Mozilla/5.0"
-        }
-      });
-
-
-      const nuevo = new Response(respuesta.body, respuesta);
-
-
-      nuevo.headers.set(
-        "Access-Control-Allow-Origin",
-        "*"
-      );
-
-
-      nuevo.headers.set(
-        "Cache-Control",
-        "public, max-age=86400"
-      );
-
-
-      ctx.waitUntil(
-        cache.put(cacheKey, nuevo.clone())
-      );
-
-
-      return nuevo;
-
-    }
-
-
-    // Playlist m3u8 siempre fresca
-
+    // Pedir al VPS
     const respuesta = await fetch(destino, {
+      method: request.method,
       headers: {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "*/*"
+      },
+
+      // Forzar caché Cloudflare
+      cf: {
+        cacheEverything: true,
+        cacheTtl: 86400
       }
     });
 
 
-    const nuevo = new Response(respuesta.body, respuesta);
+    // Crear nueva respuesta
+    const nuevo = new Response(
+      respuesta.body,
+      respuesta
+    );
 
 
+    // CORS para reproductores
     nuevo.headers.set(
       "Access-Control-Allow-Origin",
       "*"
     );
 
 
+    // Caché navegador/CDN
     nuevo.headers.set(
       "Cache-Control",
-      "no-cache, no-store, must-revalidate"
+      "public, max-age=86400"
     );
 
 
-    return nuevo;
+    // Evitar problemas HLS
+    nuevo.headers.set(
+      "Accept-Ranges",
+      "bytes"
+    );
 
+
+    // Mantener tipo correcto
+    if (path.endsWith(".m3u8")) {
+
+      nuevo.headers.set(
+        "Content-Type",
+        "application/vnd.apple.mpegurl"
+      );
+
+    }
+
+    if (path.endsWith(".ts")) {
+
+      nuevo.headers.set(
+        "Content-Type",
+        "video/mp2t"
+      );
+
+    }
+
+
+    return nuevo;
   }
 }
