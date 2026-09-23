@@ -3,58 +3,62 @@ async fetch(request) {
 
 const url = new URL(request.url);
 
-let path = url.pathname.replace("/cache","");
+const path = url.pathname.replace("/cache","");
 
-const origen = "http://fenixstream.duckdns.org";
+const origin = "http://TU_IP_O_DOMINIO_DEL_VPS";
 
-const respuesta = await fetch(origen + path + url.search, {
-headers:{
-"User-Agent":"Mozilla/5.0"
-},
-cache:"no-store"
+let response = await fetch(origin + path, {
+  headers:{
+    "User-Agent":"Mozilla/5.0"
+  },
+  cf:{
+    cacheTtl:0,
+    cacheEverything:false
+  }
 });
 
 
-const nuevo = new Response(respuesta.body, respuesta);
+let headers = new Headers(response.headers);
 
 
-nuevo.headers.set(
-"Access-Control-Allow-Origin",
-"*"
-);
+headers.set("Access-Control-Allow-Origin","*");
 
 
 if(path.endsWith(".m3u8")){
 
-nuevo.headers.set(
-"Cache-Control",
-"no-cache, no-store, must-revalidate"
-);
+ headers.set(
+ "Cache-Control",
+ "no-store, no-cache, must-revalidate, max-age=0"
+ );
 
-nuevo.headers.set(
-"CDN-Cache-Control",
-"no-store"
-);
+ headers.set(
+ "CDN-Cache-Control",
+ "no-store"
+ );
 
-nuevo.headers.set(
-"Pragma",
-"no-cache"
-);
+ headers.set(
+ "Pragma",
+ "no-cache"
+ );
 
 }
 
 
 if(path.endsWith(".ts")){
 
-nuevo.headers.set(
-"Cache-Control",
-"public, max-age=86400"
-);
+ headers.set(
+ "Cache-Control",
+ "public, max-age=86400"
+ );
 
 }
 
 
-return nuevo;
+return new Response(response.body,{
+ status:response.status,
+ headers
+});
+
 
 }
 }
