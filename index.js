@@ -6,7 +6,7 @@ export default {
     // Quita /cache para ir al origen
     const path = url.pathname.replace("/cache", "");
 
-    const origen = "https://fenixstream.duckdns.org";
+    const origen = "http://fenixstream.duckdns.org";
 
     const respuesta = await fetch(origen + path + url.search, {
       method: request.method,
