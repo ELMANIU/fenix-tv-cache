@@ -9,16 +9,30 @@ export default {
 
     const destino = origen + path + url.search;
 
-
-    const respuesta = await fetch(destino, {
+    let opciones = {
       headers: {
         "User-Agent": "Mozilla/5.0"
-      },
-      cf: {
+      }
+    };
+
+
+    if (path.endsWith(".ts")) {
+
+      opciones.cf = {
         cacheEverything: true,
         cacheTtl: 86400
-      }
-    });
+      };
+
+    } else if (path.endsWith(".m3u8")) {
+
+      opciones.cf = {
+        cacheEverything: false
+      };
+
+    }
+
+
+    const respuesta = await fetch(destino, opciones);
 
 
     const nuevo = new Response(respuesta.body, respuesta);
@@ -37,7 +51,15 @@ export default {
         "no-cache, no-store, must-revalidate"
       );
 
-    } else if (path.endsWith(".ts")) {
+      nuevo.headers.set(
+        "Content-Type",
+        "application/vnd.apple.mpegurl"
+      );
+
+    }
+
+
+    if (path.endsWith(".ts")) {
 
       nuevo.headers.set(
         "Cache-Control",
