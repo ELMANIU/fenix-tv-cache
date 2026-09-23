@@ -3,60 +3,48 @@ export default {
 
     const url = new URL(request.url);
 
-    // Quitar prefijo /cache/
+    // Quitar /cache del enlace
     let path = url.pathname.replace("/cache", "");
 
-    // Servidor origen
+    // Servidor origen VPS
     const origen = "http://fenixstream.duckdns.org";
 
     const destino = origen + path + url.search;
 
 
-    // Pedir al VPS
+    // Obtener archivo desde VPS
     const respuesta = await fetch(destino, {
       method: request.method,
+
       headers: {
         "User-Agent": "Mozilla/5.0",
         "Accept": "*/*"
       },
 
-      // Forzar caché Cloudflare
       cf: {
         cacheEverything: true,
+
+        // Caché base
         cacheTtl: 86400
       }
     });
 
 
-    // Crear nueva respuesta
     const nuevo = new Response(
       respuesta.body,
       respuesta
     );
 
 
-    // CORS para reproductores
+    // Permitir reproductores externos
     nuevo.headers.set(
       "Access-Control-Allow-Origin",
       "*"
     );
 
 
-    // Caché navegador/CDN
-    nuevo.headers.set(
-      "Cache-Control",
-      "public, max-age=86400"
-    );
+    // Tipos HLS
 
-
-    // Evitar problemas HLS
-    nuevo.headers.set(
-      "Accept-Ranges",
-      "bytes"
-    );
-
-
-    // Mantener tipo correcto
     if (path.endsWith(".m3u8")) {
 
       nuevo.headers.set(
@@ -64,7 +52,15 @@ export default {
         "application/vnd.apple.mpegurl"
       );
 
+
+      // Playlist siempre actualizada
+      nuevo.headers.set(
+        "Cache-Control",
+        "no-cache, no-store, must-revalidate"
+      );
+
     }
+
 
     if (path.endsWith(".ts")) {
 
@@ -73,9 +69,24 @@ export default {
         "video/mp2t"
       );
 
+
+      // Segmentos cacheados
+      nuevo.headers.set(
+        "Cache-Control",
+        "public, max-age=86400"
+      );
+
     }
 
 
+    // Soporte de rangos
+    nuevo.headers.set(
+      "Accept-Ranges",
+      "bytes"
+    );
+
+
     return nuevo;
+
   }
 }
