@@ -1,54 +1,60 @@
 export default {
-  async fetch(request) {
+async fetch(request) {
 
-    const url = new URL(request.url);
-    let path = url.pathname.replace("/cache", "");
+const url = new URL(request.url);
 
-    const origen = "http://fenixstream.duckdns.org";
-    const destino = origen + path + url.search;
+let path = url.pathname.replace("/cache","");
 
+const origen = "http://fenixstream.duckdns.org";
 
-    const respuesta = await fetch(destino, {
-      headers:{
-        "User-Agent":"Mozilla/5.0"
-      }
-    });
-
-
-    const nuevo = new Response(respuesta.body, respuesta);
+const respuesta = await fetch(origen + path + url.search, {
+headers:{
+"User-Agent":"Mozilla/5.0"
+},
+cache:"no-store"
+});
 
 
-    nuevo.headers.set(
-      "Access-Control-Allow-Origin",
-      "*"
-    );
+const nuevo = new Response(respuesta.body, respuesta);
 
 
-    if (path.endsWith(".m3u8")) {
-
-      nuevo.headers.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, max-age=0"
-      );
-
-      nuevo.headers.set(
-        "CDN-Cache-Control",
-        "no-store"
-      );
-
-    }
+nuevo.headers.set(
+"Access-Control-Allow-Origin",
+"*"
+);
 
 
-    if (path.endsWith(".ts")) {
+if(path.endsWith(".m3u8")){
 
-      nuevo.headers.set(
-        "Cache-Control",
-        "public, max-age=86400"
-      );
+nuevo.headers.set(
+"Cache-Control",
+"no-cache, no-store, must-revalidate"
+);
 
-    }
+nuevo.headers.set(
+"CDN-Cache-Control",
+"no-store"
+);
+
+nuevo.headers.set(
+"Pragma",
+"no-cache"
+);
+
+}
 
 
-    return nuevo;
-  }
+if(path.endsWith(".ts")){
+
+nuevo.headers.set(
+"Cache-Control",
+"public, max-age=86400"
+);
+
+}
+
+
+return nuevo;
+
+}
 }
