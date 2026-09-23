@@ -10,25 +10,66 @@ export default {
 
     const destino = origen + path + url.search;
 
+
     const respuesta = await fetch(destino, {
       headers: {
         "User-Agent": "Mozilla/5.0"
       }
     });
 
+
     const nuevo = new Response(respuesta.body, respuesta);
+
 
     nuevo.headers.set(
       "Access-Control-Allow-Origin",
       "*"
     );
 
-    // cache Cloudflare
-    nuevo.headers.set(
-      "Cache-Control",
-      "public, max-age=10"
-    );
+
+    // =========================
+    // HLS PLAYLIST
+    // =========================
+
+    if (path.endsWith(".m3u8")) {
+
+      nuevo.headers.set(
+        "Cache-Control",
+        "no-cache, no-store, must-revalidate"
+      );
+
+    }
+
+
+    // =========================
+    // SEGMENTOS VIDEO
+    // =========================
+
+    else if (path.endsWith(".ts")) {
+
+      nuevo.headers.set(
+        "Cache-Control",
+        "public, max-age=86400"
+      );
+
+    }
+
+
+    // =========================
+    // OTROS ARCHIVOS
+    // =========================
+
+    else {
+
+      nuevo.headers.set(
+        "Cache-Control",
+        "public, max-age=3600"
+      );
+
+    }
+
 
     return nuevo;
+
   }
 }
