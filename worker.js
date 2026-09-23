@@ -1,7 +1,7 @@
 const ORIGIN = "http://fenixstream.duckdns.org";
 const PREFIX = "/cache";
 
-const SEGMENT_TTL = 300;
+const SEGMENT_TTL = 60;
 const HEADER_TIMEOUT_MS = 15000;
 
 const TYPES = {
