@@ -1,46 +1,41 @@
 const ORIGIN = "http://fenixstream.duckdns.org";
 const PREFIX = "/cache";
 
-const PLAYLIST_TTL = 0;
-const SEGMENT_TTL = 20;
-const HEADER_TIMEOUT_MS = 15000;
+const PLAYLIST_PATH = "/canales/";
 
 const TYPES = {
   m3u8: "application/vnd.apple.mpegurl",
   ts: "video/mp2t",
   m4s: "video/iso.segment",
-  mp4: "video/mp4",
-  aac: "audio/aac",
-  vtt: "text/vtt; charset=utf-8",
-  webvtt: "text/vtt; charset=utf-8",
-  key: "application/octet-stream",
+  key: "application/octet-stream"
 };
 
 
-function cors(headers) {
+function cors(headers = new Headers()) {
   headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  headers.set(
-    "Access-Control-Allow-Headers",
-    "Range, If-Range, If-None-Match, If-Modified-Since"
-  );
-  headers.set(
-    "Access-Control-Expose-Headers",
-    "Content-Length, Content-Range, Accept-Ranges, ETag"
-  );
-
+  headers.set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "*");
   return headers;
 }
 
 
-function errorResponse(msg, status) {
-  return new Response(msg, {
-    status,
-    headers: cors(new Headers({
-      "Content-Type":"text/plain",
-      "Cache-Control":"no-store"
-    }))
-  });
+function noCache(headers) {
+  headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, max-age=0"
+  );
+
+  headers.set(
+    "CDN-Cache-Control",
+    "no-store"
+  );
+
+  headers.set(
+    "Cloudflare-CDN-Cache-Control",
+    "no-store"
+  );
+
+  return headers;
 }
 
 
@@ -48,11 +43,12 @@ function validPath(path) {
 
   try {
 
-    const decoded = decodeURIComponent(path);
+    const d = decodeURIComponent(path);
 
-    return decoded.startsWith("/canales/")
-      && !decoded.includes("..")
-      && !/[\\\x00-\x1f]/.test(decoded);
+    return (
+      d.startsWith(PLAYLIST_PATH) &&
+      !d.includes("..")
+    );
 
   } catch {
 
@@ -63,60 +59,46 @@ function validPath(path) {
 }
 
 
-
-function rewritePlaylist(text, originURL, workerOrigin){
-
-  if(!text.trim().startsWith("#EXTM3U")){
-    throw new Error("Playlist inválida");
-  }
+function rewritePlaylist(text, workerOrigin, originalURL) {
 
 
-  function proxyURI(value){
-
-    const target = new URL(value, originURL);
+  return text
+  .split("\n")
+  .map(line => {
 
 
     if(
-      target.host !== new URL(ORIGIN).host ||
-      !validPath(target.pathname)
+      line.startsWith("#") ||
+      line.trim()===""
     ){
 
-      throw new Error("Ruta externa bloqueada");
+      return line;
 
     }
 
 
-    return workerOrigin + PREFIX + target.pathname + target.search;
+    try {
 
-  }
+      let u = new URL(line, originalURL);
 
-
-
-  return text
-    .split(/\r?\n/)
-    .map(line=>{
-
-      let t=line.trim();
-
-
-      if(!t) return line;
-
-
-      if(!t.startsWith("#")){
-
-        return proxyURI(t);
-
-      }
-
-
-      return line.replace(
-        /URI="([^"]*)"/g,
-        (_,uri)=>`URI="${proxyURI(uri)}"`
+      return (
+        workerOrigin +
+        PREFIX +
+        u.pathname +
+        u.search
       );
 
 
-    })
-    .join("\n");
+    } catch {
+
+      return line;
+
+    }
+
+
+  })
+  .join("\n");
+
 
 }
 
@@ -130,316 +112,256 @@ async fetch(request){
 
 if(request.method==="OPTIONS"){
 
- return new Response(null,{
-  status:204,
-  headers:cors(new Headers())
- });
-
-}
-
-
-
-if(!["GET","HEAD"].includes(request.method)){
-
- return errorResponse(
-  "Método no permitido",
-  405
- );
-
-}
-
-
-
-const url=new URL(request.url);
-
-
-
-if(!url.pathname.startsWith(PREFIX+"/")){
-
- return errorResponse(
-  "Ruta incorrecta",
-  404
- );
-
-}
-
-
-
-const path=url.pathname.slice(PREFIX.length);
-
-
-
-const ext=path.split(".").pop().toLowerCase();
-
-
-
-if(!validPath(path) || !TYPES[ext]){
-
- return errorResponse(
-  "Archivo no permitido",
-  404
- );
-
-}
-
-
-
-const isPlaylist=ext==="m3u8";
-
-
-const ttl=isPlaylist
- ? PLAYLIST_TTL
- : SEGMENT_TTL;
-
-
-
-const originURL=
- ORIGIN+
- path+
- url.search;
-
-
-
-const headersOrigin=new Headers({
-
- "User-Agent":
- "Mozilla/5.0 Fenix-HLS",
-
- "Accept":"*/*"
-
+return new Response(null,{
+status:204,
+headers:cors()
 });
-
-
-
-if(!isPlaylist){
-
- for(const h of ["Range","If-Range"]){
-
-  if(request.headers.has(h)){
-
-   headersOrigin.set(
-    h,
-    request.headers.get(h)
-   );
-
-  }
-
- }
-
-}
-
-
-
-try{
-
-
-const controller=new AbortController();
-
-
-const timer=setTimeout(
- ()=>controller.abort(),
- HEADER_TIMEOUT_MS
-);
-
-
-
-let response;
-
-
-
-try{
-
-
-response=await fetch(
- originURL,
- {
-
- method:request.method,
-
- headers:headersOrigin,
-
- redirect:"manual",
-
- signal:controller.signal,
-
-
- cf:{
-
- cacheEverything:true,
-
- cacheTtlByStatus:{
-
- "200":ttl,
-
- "206":ttl,
-
- "404":-1,
-
- "500":-1
-
- }
-
- }
-
-
- });
-
-
-}
-
-finally{
-
- clearTimeout(timer);
 
 }
 
 
 
 if(
- response.status!==200 &&
- response.status!==206
+request.method!=="GET" &&
+request.method!=="HEAD"
 ){
 
- return errorResponse(
-  "Origen respondió "+response.status,
-  502
- );
+return new Response("Method not allowed",{
+status:405
+});
+
+}
+
+
+
+const url = new URL(request.url);
+
+
+
+if(
+!url.pathname.startsWith(PREFIX)
+){
+
+return new Response("404",{
+status:404
+});
+
+}
+
+
+
+const path =
+url.pathname.substring(
+PREFIX.length
+);
+
+
+
+if(!validPath(path)){
+
+return new Response("invalid path",{
+status:403
+});
+
+}
+
+
+
+const ext =
+path.split(".").pop().toLowerCase();
+
+
+
+if(!TYPES[ext]){
+
+return new Response("extension denied",{
+status:403
+});
+
+}
+
+
+
+const isPlaylist =
+ext==="m3u8";
+
+
+
+const originURL =
+ORIGIN +
+path +
+url.search;
+
+
+
+let headers = new Headers();
+
+headers.set(
+"User-Agent",
+"Mozilla/5.0 Fenix-HLS"
+);
+
+headers.set(
+"Accept",
+"*/*"
+);
+
+
+
+try{
+
+
+let response =
+await fetch(
+originURL,
+{
+
+
+method:request.method,
+
+
+headers,
+
+
+redirect:"follow",
+
+
+
+cf:
+isPlaylist
+
+?
+
+{
+
+cacheEverything:false
+
+}
+
+:
+
+{
+
+cacheEverything:true,
+cacheTtl:30
+
+}
+
+
+
+});
+
+
+
+
+if(
+response.status!==200
+){
+
+return new Response(
+"Origin error "+response.status,
+{
+status:502
+}
+);
 
 }
 
 
 
 
-const headers=cors(
- new Headers(response.headers)
+let out =
+new Headers(response.headers);
+
+
+
+out.set(
+"Content-Type",
+TYPES[ext]
 );
 
 
 
-headers.set(
- "Content-Type",
- TYPES[ext]
-);
+out = cors(out);
 
 
 
-headers.delete("Set-Cookie");
-headers.delete("Expires");
-headers.delete("Pragma");
-
-
+let body =
+response.body;
 
 
 
 if(isPlaylist){
 
 
-headers.set(
- "Cache-Control",
- "no-store, no-cache, must-revalidate"
-);
+let text =
+await response.text();
 
 
-headers.set(
- "CDN-Cache-Control",
- "no-store"
-);
 
-
-headers.set(
- "Cloudflare-CDN-Cache-Control",
- "no-store"
+text =
+rewritePlaylist(
+text,
+url.origin,
+originURL
 );
 
 
 
-for(
- const h of [
- "Content-Length",
- "ETag",
- "Last-Modified"
- ]
-){
+body=text;
 
- headers.delete(h);
+
+
+out=noCache(out);
+
+
+
+out.delete("ETag");
+out.delete("Content-Length");
+out.delete("Age");
+
 
 }
+else{
 
 
+out.set(
+"Cache-Control",
+"public,max-age=30"
+);
 
-const body =
- request.method==="HEAD"
- ? null
- : rewritePlaylist(
-     await response.text(),
-     originURL,
-     url.origin
-   );
+
+}
 
 
 
 return new Response(
- body,
- {
- status:200,
- headers
- }
+request.method==="HEAD"
+?
+null
+:
+body,
+{
+status:200,
+headers:out
+}
 );
 
 
 
 }
-
-
-
-
-// SEGMENTOS TS
-
-
-headers.set(
- "Cache-Control",
- `public, max-age=${SEGMENT_TTL}`
-);
-
-
-headers.set(
- "CDN-Cache-Control",
- `public, max-age=${SEGMENT_TTL}`
-);
-
-
-headers.set(
- "Cloudflare-CDN-Cache-Control",
- `public, max-age=${SEGMENT_TTL}`
-);
-
-
-
-return new Response(
- request.method==="HEAD"
- ? null
- : response.body,
- {
- status:response.status,
- headers
- }
-);
-
-
-
-}
-
 catch(e){
 
 
-return errorResponse(
- "Error: "+e.message,
- 504
+return new Response(
+"Worker error: "+e.message,
+{
+status:500
+}
 );
 
 
 }
-
 
 
 }
