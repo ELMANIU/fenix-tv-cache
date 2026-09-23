@@ -7,29 +7,57 @@ export default {
 
     const origin = "http://fenixstream.duckdns.org" + path + url.search;
 
-    const newRequest = new Request(origin, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Cache-Control": "no-cache"
-      },
-      cf: {
-        cacheTtl: 0,
-        cacheEverything: false
-      }
-    });
+
+    const isPlaylist = path.endsWith(".m3u8");
+    const isSegment = path.endsWith(".ts");
 
 
-    const response = await fetch(newRequest);
+    let response;
+
+    try {
+
+      response = await fetch(origin, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "Accept": "*/*",
+          "Connection": "keep-alive"
+        },
+
+        cf: {
+          cacheTtl: 0,
+          cacheEverything: false
+        }
+      });
+
+
+    } catch (e) {
+
+      return new Response(
+        "Origin error",
+        {
+          status: 502
+        }
+      );
+
+    }
+
 
     const headers = new Headers(response.headers);
 
 
-    if (url.pathname.endsWith(".m3u8")) {
+    // Limpieza HLS
+    headers.delete("ETag");
+    headers.delete("Age");
+    headers.delete("Last-Modified");
+
+
+    // Playlist vivo
+    if (isPlaylist) {
 
       headers.set(
         "Cache-Control",
-        "no-cache, no-store, must-revalidate"
+        "no-store, no-cache, must-revalidate"
       );
 
       headers.set(
@@ -41,20 +69,38 @@ export default {
         "Cloudflare-CDN-Cache-Control",
         "no-store"
       );
+
+      headers.set(
+        "Content-Type",
+        "application/vnd.apple.mpegurl"
+      );
+
     }
 
 
-    if (url.pathname.endsWith(".ts")) {
+    // Segmentos TS
+    if (isSegment) {
 
       headers.set(
         "Cache-Control",
-        "public, max-age=3"
+        "no-store"
       );
 
       headers.set(
         "CDN-Cache-Control",
-        "public, max-age=3"
+        "no-store"
       );
+
+      headers.set(
+        "Cloudflare-CDN-Cache-Control",
+        "no-store"
+      );
+
+      headers.set(
+        "Content-Type",
+        "video/mp2t"
+      );
+
     }
 
 
@@ -64,10 +110,19 @@ export default {
     );
 
 
-    return new Response(response.body, {
-      status: response.status,
-      headers
-    });
+    headers.set(
+      "Access-Control-Allow-Headers",
+      "*"
+    );
+
+
+    return new Response(
+      response.body,
+      {
+        status: response.status,
+        headers
+      }
+    );
 
   }
 };
