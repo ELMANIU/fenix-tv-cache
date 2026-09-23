@@ -9,40 +9,19 @@ export default {
 
     const destino = origen + path + url.search;
 
-    let opciones = {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
+
+    const headers = {
+      "User-Agent": "Mozilla/5.0"
     };
 
 
-    if (path.endsWith(".ts")) {
-
-      opciones.cf = {
-        cacheEverything: true,
-        cacheTtl: 86400
-      };
-
-    } else {
-
-      opciones.cf = {
-        cacheEverything: false
-      };
-
-    }
-
-
-    const respuesta = await fetch(destino, opciones);
-
-    const nuevo = new Response(respuesta.body, respuesta);
-
-    nuevo.headers.set(
-      "Access-Control-Allow-Origin",
-      "*"
-    );
-
-
     if (path.endsWith(".m3u8")) {
+
+      const respuesta = await fetch(destino, {
+        headers
+      });
+
+      const nuevo = new Response(respuesta.body, respuesta);
 
       nuevo.headers.set(
         "Cache-Control",
@@ -50,21 +29,36 @@ export default {
       );
 
       nuevo.headers.set(
-        "Content-Type",
-        "application/vnd.apple.mpegurl"
+        "Access-Control-Allow-Origin",
+        "*"
       );
+
+      return nuevo;
 
     }
 
 
-    if (path.endsWith(".ts")) {
+    const respuesta = await fetch(destino, {
+      headers,
+      cf:{
+        cacheEverything:true,
+        cacheTtl:86400
+      }
+    });
 
-      nuevo.headers.set(
-        "Cache-Control",
-        "public, max-age=86400"
-      );
 
-    }
+    const nuevo = new Response(respuesta.body, respuesta);
+
+
+    nuevo.headers.set(
+      "Cache-Control",
+      "public, max-age=86400"
+    );
+
+    nuevo.headers.set(
+      "Access-Control-Allow-Origin",
+      "*"
+    );
 
 
     return nuevo;
