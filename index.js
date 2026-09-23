@@ -3,26 +3,20 @@ export default {
 
     const url = new URL(request.url);
 
-    // Quita /cache para apuntar al origen
     const path = url.pathname.replace(/^\/cache/, "");
 
     const origin = "http://fenixstream.duckdns.org" + path + url.search;
 
     const response = await fetch(origin, {
-      method: request.method,
       headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Cache-Control": "no-cache"
+        "User-Agent": "Mozilla/5.0"
       }
     });
 
     const headers = new Headers(response.headers);
 
-    // HLS EN VIVO: nunca guardar en caché
-    if (
-      url.pathname.endsWith(".m3u8") ||
-      url.pathname.endsWith(".ts")
-    ) {
+    // PLAYLIST EN VIVO
+    if (url.pathname.endsWith(".m3u8")) {
 
       headers.set(
         "Cache-Control",
@@ -38,12 +32,24 @@ export default {
         "Cloudflare-CDN-Cache-Control",
         "no-store"
       );
-
-      headers.delete("Age");
-      headers.delete("ETag");
     }
 
-    // CORS
+
+    // SEGMENTOS TS
+    if (url.pathname.endsWith(".ts")) {
+
+      headers.set(
+        "Cache-Control",
+        "public, max-age=5"
+      );
+
+      headers.set(
+        "CDN-Cache-Control",
+        "public, max-age=5"
+      );
+    }
+
+
     headers.set(
       "Access-Control-Allow-Origin",
       "*"
